@@ -1,0 +1,21 @@
+{
+  "bg": "{{colors.surface_container_lowest.default.hex}}",
+  "panel": "{{colors.surface.default.hex}}",
+  "surface": "{{colors.surface_container_low.default.hex}}",
+  "card": "{{colors.surface_container_high.default.hex}}",
+  "cardHover": "{{colors.surface_container_highest.default.hex}}",
+  "cardHi": "{{colors.surface_bright.default.hex}}",
+  "text": "{{colors.on_surface.default.hex}}",
+  "subtext": "{{colors.on_surface_variant.default.hex}}",
+  "muted": "{{colors.outline.default.hex}}",
+  "dim": "{{colors.outline_variant.default.hex | lighten: 8.0}}",
+  "primary": "{{colors.primary.default.hex}}",
+  "secondary": "{{colors.secondary.default.hex}}",
+  "tertiary": "{{colors.tertiary.default.hex}}",
+  "onPrimary": "{{colors.on_primary.default.hex}}",
+  "primaryContainer": "{{colors.primary_container.default.hex}}",
+  "tertiaryContainer": "{{colors.tertiary_container.default.hex}}",
+  "red": "{{colors.error.default.hex}}",
+  "pink": "#f9a8d4",
+  "yellow": "#f5d58a"
+}

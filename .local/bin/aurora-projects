@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-projects  ·  list git projects for the launcher (~ mode)
+#
+# Prints one line per repo, most recently committed first:
+#   name<TAB>path<TAB>branch<TAB>dirty(0/1)<TAB>last-commit-epoch<TAB>language
+# The first line is "#editor<TAB><cmd>": the editor the launcher will open projects in.
+#
+# Where to look (space separated), override in ~/.config/fish/config.fish with:
+#   set -Ux AURORA_PROJECT_DIRS "$HOME/code $HOME/college"
+# Editor: set -Ux AURORA_EDITOR code   (or codium, zed, nvim, hx …)
+
+dirs="${AURORA_PROJECT_DIRS:-$HOME/code $HOME/projects $HOME/dev $HOME/src $HOME/work $HOME/repos $HOME/github $HOME/Documents $HOME/college}"
+
+editor="${AURORA_EDITOR:-}"
+if [ -z "$editor" ]; then
+    for e in code codium code-oss zed nvim vim hx; do
+        command -v "$e" >/dev/null 2>&1 && { editor=$e; break; }
+    done
+fi
+printf '#editor\t%s\n' "${editor:-nvim}"
+
+lang_of() {
+    local p=$1
+    [ -f "$p/go.mod" ] && { echo go; return; }
+    [ -f "$p/Cargo.toml" ] && { echo rust; return; }
+    [ -f "$p/package.json" ] && { [ -f "$p/tsconfig.json" ] && echo ts || echo js; return; }
+    [ -f "$p/pyproject.toml" ] || [ -f "$p/requirements.txt" ] || [ -f "$p/manage.py" ] && { echo python; return; }
+    [ -f "$p/pom.xml" ] || [ -f "$p/build.gradle" ] && { echo java; return; }
+    [ -f "$p/CMakeLists.txt" ] || [ -f "$p/Makefile" ] && { echo c; return; }
+    [ -f "$p/Dockerfile" ] || [ -f "$p/docker-compose.yml" ] && { echo docker; return; }
+    echo ""
+}
+
+for d in $dirs; do
+    [ -d "$d" ] || continue
+    find -L "$d" -maxdepth 4 -type d -name .git -prune \
+        -not -path '*/node_modules/*' -not -path '*/.cache/*' 2>/dev/null
+done | sort -u | while read -r g; do
+    p=${g%/.git}
+    branch=$(git -C "$p" symbolic-ref --short -q HEAD 2>/dev/null || git -C "$p" rev-parse --short HEAD 2>/dev/null)
+    dirty=0
+    [ -n "$(git -C "$p" status --porcelain --untracked-files=no 2>/dev/null | head -1)" ] && dirty=1
+    ts=$(git -C "$p" log -1 --format=%ct 2>/dev/null || stat -c %Y "$p")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(basename "$p")" "$p" "${branch:--}" "$dirty" "${ts:-0}" "$(lang_of "$p")"
+done | sort -t$'\t' -k5,5nr

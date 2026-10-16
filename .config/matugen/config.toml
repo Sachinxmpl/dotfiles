@@ -1,0 +1,25 @@
+# ~/.config/matugen/config.toml  ·  Aurora auto-colours
+# aurora-wall runs:  matugen image <wallpaper> -m dark -t scheme-vibrant
+# Each template below is filled with colours from the wallpaper.
+
+[config]
+prefer = "saturation"
+
+[templates.quickshell]
+input_path  = "~/.config/matugen/templates/quickshell.json"
+output_path = "~/.cache/aurora/colors.json"
+
+[templates.hyprland]
+input_path  = "~/.config/matugen/templates/hypr-colors.lua"
+output_path = "~/.config/hypr/colors.lua"
+post_hook   = "hyprctl reload >/dev/null 2>&1 || true"
+
+[templates.kitty]
+input_path  = "~/.config/matugen/templates/kitty-colors.conf"
+output_path = "~/.config/kitty/colors.conf"
+post_hook   = "pkill -USR1 -x kitty || true"
+
+[templates.starship]
+input_path  = "~/.config/matugen/templates/starship.toml"
+output_path = "~/.config/starship.toml"
+

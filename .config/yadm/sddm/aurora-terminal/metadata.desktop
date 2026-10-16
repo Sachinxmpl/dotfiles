@@ -1,0 +1,11 @@
+[SddmGreeterTheme]
+Name=Aurora Terminal
+Description=Login screen matching the Aurora "terminal session" lock screen
+Author=nichas
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=aurora
+Theme-API=2.0
+QtVersion=6

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-wall  ·  set a wallpaper and recolour the desktop to match
+#
+#   aurora-wall <image>              set wallpaper + generate colours (matugen)
+#   aurora-wall <image> --keep       set wallpaper, keep the current colours
+#   aurora-wall --random             random image from ~/wallpapers
+#   aurora-wall --restore            re-apply the last wallpaper (used at login)
+#
+# Wallpapers live in ~/wallpapers (png/jpg/jpeg/webp). Super+W opens the picker.
+
+set -u
+WALLDIR="${AURORA_WALLDIR:-$HOME/wallpapers}"
+CACHE="$HOME/.cache/aurora"
+LAST="$CACHE/wallpaper.path"
+SCHEME="${AURORA_SCHEME:-scheme-vibrant}"   # or: scheme-content (closer to the image) · scheme-tonal-spot (calmer)
+mkdir -p "$CACHE"
+
+list_walls() {
+    find -L "$WALLDIR" -maxdepth 2 -type f \
+        \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null
+}
+
+ensure_daemon() {
+    awww query >/dev/null 2>&1 && return
+    (awww-daemon >/dev/null 2>&1 &)
+    for _ in $(seq 20); do awww query >/dev/null 2>&1 && return; sleep 0.1; done
+}
+
+set_wall() {
+    # a soft circle growing out of the top-right corner (where the control centre is);
+    # falls back to the default transition if this awww build doesn't know those flags
+    awww img "$1" --transition-type grow --transition-pos top-right \
+        --transition-duration 1.1 --transition-fps 144 2>/dev/null \
+    || awww img "$1"
+}
+
+colors=1
+img=""
+case "${1:-}" in
+    --restore)
+        img=$(cat "$LAST" 2>/dev/null)
+        [ -f "$img" ] || img="$WALLDIR/aurora.png"
+        [ -f "$CACHE/colors.json" ] && colors=0      # colours already generated
+        ;;
+    --random)
+        cur=$(cat "$LAST" 2>/dev/null)
+        img=$(list_walls | grep -vxF "$cur" | shuf -n1)
+        ;;
+    ""|-h|--help)
+        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *)
+        img=$(realpath "$1") ;;
+esac
+[ "${2:-}" = "--keep" ] && colors=0
+
+if [ ! -f "$img" ]; then
+    notify-send -a "Wallpaper" "No wallpaper found" "Put images in $WALLDIR" 2>/dev/null
+    echo "aurora-wall: no image ($img)" >&2; exit 1
+fi
+
+ensure_daemon
+set_wall "$img"
+printf '%s' "$img" > "$LAST"
+
+if [ "$colors" = 1 ]; then
+    matugen image "$img" -m dark -t "$SCHEME" -q \
+        || notify-send -a "Wallpaper" "Couldn't generate colours" "matugen failed for $(basename "$img")"
+fi

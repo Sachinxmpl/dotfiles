@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# ~/.config/yadm/bootstrap — runs after `yadm clone` on a new machine (or: yadm bootstrap)
+# Installs packages, the login theme, dark mode and generates wallpaper colours.
+set -euo pipefail
+
+echo ":: packages"
+grep -v '^#' "$HOME/.config/yadm/packages.txt" | xargs sudo pacman -S --needed --noconfirm
+
+echo ":: login screen (SDDM theme lives in ~/.config/yadm/sddm)"
+if [ -d "$HOME/.config/yadm/sddm/aurora-terminal" ]; then
+    sudo cp -r "$HOME/.config/yadm/sddm/aurora-terminal" /usr/share/sddm/themes/
+    sudo mkdir -p /etc/sddm.conf.d
+    printf '[Theme]\nCurrent=aurora-terminal\n' | sudo tee /etc/sddm.conf.d/10-aurora-theme.conf >/dev/null
+    sudo systemctl enable sddm
+fi
+
+echo ":: dark mode + defaults"
+gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
+gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3-dark || true
+gsettings set org.gnome.desktop.interface icon-theme Papirus-Dark || true
+gsettings set org.gnome.desktop.interface accent-color teal || true
+xdg-mime default org.gnome.Nautilus.desktop inode/directory || true
+[ "$(basename "$SHELL")" = fish ] || chsh -s /usr/bin/fish || true
+
+echo ":: wallpaper colours"
+wall=$(ls "$HOME"/wallpapers/* 2>/dev/null | head -1 || true)
+[ -n "$wall" ] && "$HOME/.local/bin/aurora-wall" "$wall" || true
+
+echo ":: done — reboot and log in to Hyprland"

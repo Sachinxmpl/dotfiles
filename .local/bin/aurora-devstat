@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-devstat  ·  dev status for the Aurora bar / Dev panel
+#
+#   aurora-devstat [dir | pid:<terminal pid>]
+#     pid:<n>  use the working directory of the shell running inside that terminal
+# Prints tab-separated lines:
+#   cwd   <path>
+#   git   <repo> <branch> <changed-files> <ahead> <behind> <path>
+#   ctr   <name> <image> <state> <status> <ports>          (docker, running + stopped)
+#   port  <port> <process> <pid> <address>                 (TCP ports listening)
+#   docker <ok|off|none>
+# Cheap enough to run every few seconds.
+
+arg="${1:-}"
+dir="$arg"
+if [ "${arg#pid:}" != "$arg" ]; then
+    pid=${arg#pid:}
+    dir=""
+    # newest child of the terminal = the shell in the window you're typing in
+    for c in $(pgrep -P "$pid" 2>/dev/null | sort -n); do
+        d=$(readlink "/proc/$c/cwd" 2>/dev/null) && dir=$d
+    done
+fi
+[ -n "$dir" ] && printf 'cwd\t%s\n' "$dir"
+
+# ---- git (for the directory the shell passes in: the focused terminal's cwd)
+if [ -n "$dir" ] && [ -d "$dir" ] && top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null); then
+    branch=$(git -C "$top" symbolic-ref --short -q HEAD 2>/dev/null || git -C "$top" rev-parse --short HEAD 2>/dev/null)
+    changed=$(git -C "$top" status --porcelain 2>/dev/null | wc -l)
+    ab=$(git -C "$top" rev-list --left-right --count '@{upstream}...HEAD' 2>/dev/null)
+    behind=${ab%%[[:space:]]*}; ahead=${ab##*[[:space:]]}
+    printf 'git\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(basename "$top")" "$branch" "$changed" "${ahead:-0}" "${behind:-0}" "$top"
+fi
+
+# ---- docker
+if command -v docker >/dev/null 2>&1; then
+    if out=$(timeout 2 docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.State}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null); then
+        echo "docker	ok"
+        [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/ctr\t/' | head -20
+    else
+        echo "docker	off"          # daemon stopped, or you're not in the docker group
+    fi
+else
+    echo "docker	none"
+fi
+
+# ---- listening TCP ports (process names show for your own processes)
+ss -Hltnp 2>/dev/null | awk '
+{
+    addr = $4; port = addr; sub(/.*:/, "", port)
+    host = addr; sub(/:[^:]*$/, "", host)
+    proc = "-"; pid = "-"
+    if (match($0, /users:\(\("[^"]+",pid=[0-9]+/)) {
+        u = substr($0, RSTART, RLENGTH)
+        proc = u; sub(/users:\(\("/, "", proc); sub(/".*/, "", proc)
+        pid = u; sub(/.*pid=/, "", pid)
+    }
+    if (!(port in seen)) { seen[port] = 1; printf "port\t%s\t%s\t%s\t%s\n", port, proc, pid, host }
+}' | sort -t$'\t' -k2,2n

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-shot  ·  screenshots
+#
+#   aurora-shot region|window|screen [--edit] [--delay N]
+#
+# Saves to ~/Pictures/Screenshots, copies the image to the clipboard and shows a
+# notification (click it to open the folder). --edit opens it in satty to annotate.
+
+set -u
+mode="${1:-region}"; shift || true
+edit=0; delay=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --edit)  edit=1 ;;
+        --delay) delay="${2:-0}"; shift ;;
+    esac
+    shift
+done
+
+dir="$HOME/Pictures/Screenshots"
+mkdir -p "$dir"
+file="$dir/shot-$(date +%F_%H-%M-%S).png"
+
+sleep 0.25                      # let the capture menu fade out first
+[ "$delay" -gt 0 ] 2>/dev/null && sleep "$delay"
+
+case "$mode" in
+    region)
+        geom=$(slurp -d -b '#05080f88' -c '#6ee7c8ff' -w 2) || exit 0 ;;
+    window)
+        # pick any window on the current workspace (click it), or Esc to cancel
+        ws=$(hyprctl activeworkspace -j | jq -r '.id')
+        geom=$(hyprctl clients -j | jq -r --argjson ws "$ws" \
+            '.[] | select(.workspace.id == $ws and .hidden == false) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' \
+            | slurp -r -b '#05080f55' -c '#6ee7c8ff' -w 2) || exit 0 ;;
+    screen)
+        geom="" ;;
+    *)
+        echo "usage: aurora-shot region|window|screen [--edit] [--delay N]" >&2; exit 1 ;;
+esac
+
+if [ -n "$geom" ]; then grim -g "$geom" "$file"; else grim "$file"; fi || exit 1
+
+if [ "$edit" = 1 ] && command -v satty >/dev/null; then
+    # satty: draw arrows/boxes/text, Ctrl+C copies, Ctrl+S saves over the file
+    satty --filename "$file" --output-filename "$file" --copy-command wl-copy --early-exit &
+else
+    wl-copy --type image/png < "$file"
+fi
+
+# notification with a thumbnail; clicking "Open" shows the file in Nautilus
+(
+    act=$(timeout 60 notify-send -a "Screenshot" -i "$file" -A open=Open -A edit=Edit \
+        "Screenshot saved" "Copied to clipboard · $(basename "$file")")
+    case "$act" in
+        open) nautilus --select "$file" >/dev/null 2>&1 || xdg-open "$dir" ;;
+        edit) command -v satty >/dev/null && satty --filename "$file" --output-filename "$file" --copy-command wl-copy ;;
+    esac
+) >/dev/null 2>&1 &

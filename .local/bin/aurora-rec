@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-rec  ·  screen recording (wf-recorder)
+#
+#   aurora-rec start region|screen [--audio system|mic|none]
+#   aurora-rec stop
+#   aurora-rec toggle [region|screen]     start if idle, stop if recording
+#
+# Saves to ~/Videos/Recordings as .mp4. While recording, the bar shows a red
+# timer; click it (or run `aurora-rec stop`) to finish.
+
+set -u
+state="$HOME/.cache/aurora/rec.state"      # "<start-epoch> <pid> <file>" while recording
+mkdir -p "$(dirname "$state")"
+
+is_recording() { [ -f "$state" ] && kill -0 "$(cut -d' ' -f2 "$state")" 2>/dev/null; }
+
+stop() {
+    if is_recording; then
+        read -r _ pid file < "$state"
+        kill -INT "$pid"                      # wf-recorder finalises the mp4 on SIGINT
+        for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+        rm -f "$state"
+        (
+            act=$(timeout 60 notify-send -a "Recording" -i video-x-generic -A open=Open -A folder="Show in folder" \
+                "Recording saved" "$(basename "$file")")
+            case "$act" in
+                open)   xdg-open "$file" ;;
+                folder) nautilus --select "$file" >/dev/null 2>&1 || xdg-open "$(dirname "$file")" ;;
+            esac
+        ) >/dev/null 2>&1 &
+    else
+        rm -f "$state"
+    fi
+}
+
+start() {
+    is_recording && { notify-send -a "Recording" "Already recording" "Click the red timer in the bar to stop"; exit 0; }
+    mode="${1:-region}"; shift || true
+    audio="none"
+    while [ $# -gt 0 ]; do
+        case "$1" in --audio) audio="${2:-none}"; shift ;; esac
+        shift
+    done
+
+    dir="$HOME/Videos/Recordings"; mkdir -p "$dir"
+    file="$dir/rec-$(date +%F_%H-%M-%S).mp4"
+    sleep 0.25
+
+    args=(-f "$file")
+    if [ "$mode" = region ]; then
+        geom=$(slurp -d -b '#05080f88' -c '#ff7a90ff' -w 2) || exit 0
+        args+=(-g "$geom")
+    fi
+    case "$audio" in
+        system) args+=("--audio=$(pactl get-default-sink).monitor") ;;
+        mic)    args+=("--audio=$(pactl get-default-source)") ;;
+    esac
+
+    # 3-2-1 so you can get ready
+    for n in 3 2 1; do notify-send -a "Recording" -t 900 -h string:x-canonical-private-synchronous:rec "Recording in $n…"; sleep 1; done
+
+    setsid wf-recorder "${args[@]}" >/dev/null 2>&1 &
+    pid=$!
+    sleep 0.3
+    kill -0 "$pid" 2>/dev/null || { notify-send -a "Recording" -u critical "Recording failed" "Is wf-recorder installed?"; exit 1; }
+    echo "$(date +%s) $pid $file" > "$state"
+}
+
+case "${1:-toggle}" in
+    start)  shift; start "$@" ;;
+    stop)   stop ;;
+    toggle) shift || true; if is_recording; then stop; else start "${1:-region}"; fi ;;
+    status) is_recording && cat "$state" || echo idle ;;
+    *) sed -n '2,9p' "$0"; exit 1 ;;
+esac
