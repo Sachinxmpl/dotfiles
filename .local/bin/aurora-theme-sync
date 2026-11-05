@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-theme-sync  ·  copy the wallpaper-generated VS Code theme into the
+# installed "Aurora (wallpaper)" extension (VS Code, VSCodium / Code - OSS). Run by matugen.
+src="$HOME/.cache/aurora/vscode-theme.json"
+[ -f "$src" ] || exit 0
+for dir in "$HOME"/.vscode/extensions "$HOME"/.vscode-oss/extensions; do
+    for themes in "$dir"/aurora.aurora-wallpaper-theme-*/themes; do
+        [ -d "$themes" ] && cp -f "$src" "$themes/aurora-color-theme.json"
+    done
+done
+exit 0

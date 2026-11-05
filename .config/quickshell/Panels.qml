@@ -14,7 +14,23 @@ Singleton {
     property bool overviewOpen: false
     property bool devOpen: false
     property bool captureOpen: false
-    readonly property bool anyOpen: ccOpen || launcherOpen || wallsOpen || dashOpen || overviewOpen || devOpen || captureOpen
+    property bool powerOpen: false
+    property bool radarOpen: false
+    property string radarMode: "wifi"   // wifi · bt
+    property bool notifOpen: false
+    property bool mediaOpen: false
+    property bool audioOpen: false
+    property bool gpuOpen: false
+    property bool clipOpen: false
+    property bool focusOpen: false
+    // webcam mirror (Mirror.qml). The bubble mode floats over everything, so other panels don't close it.
+    property bool mirrorOpen: false
+    property bool mirrorBubble: false
+    property bool mirrorRecording: false     // keeps it loaded until the clip is written
+    property int  bubbleX: -1                // -1: bottom-right corner
+    property int  bubbleY: -1
+    property int  bubbleSize: 220
+    readonly property bool anyOpen: ccOpen || launcherOpen || wallsOpen || dashOpen || overviewOpen || devOpen || captureOpen || powerOpen || radarOpen || notifOpen || mediaOpen || audioOpen || gpuOpen || clipOpen || focusOpen
 
     function toggleCc() {
         const v = !ccOpen;
@@ -51,7 +67,61 @@ Singleton {
         closeAll();
         captureOpen = v;
     }
+    function togglePower() {
+        const v = !powerOpen;
+        closeAll();
+        powerOpen = v;
+    }
+    // same mode again closes it; the other mode switches tab
+    function toggleRadar(m) {
+        const close = radarOpen && radarMode === m;
+        closeAll();
+        radarMode = m;
+        radarOpen = !close;
+    }
+    function toggleNotif() {
+        const v = !notifOpen;
+        closeAll();
+        notifOpen = v;
+    }
+    function toggleMedia() {
+        const v = !mediaOpen;
+        closeAll();
+        mediaOpen = v;
+    }
+    function toggleAudio() {
+        const v = !audioOpen;
+        closeAll();
+        audioOpen = v;
+    }
+    function toggleGpu() {
+        const v = !gpuOpen;
+        closeAll();
+        gpuOpen = v;
+    }
+    function toggleClip() {
+        const v = !clipOpen;
+        closeAll();
+        clipOpen = v;
+    }
+    function toggleFocus() {
+        const v = !focusOpen;
+        closeAll();
+        focusOpen = v;
+    }
+    function toggleMirror() {
+        if (mirrorOpen) { mirrorOpen = false; return; }
+        closeAll();
+        mirrorBubble = false;
+        mirrorOpen = true;
+    }
+    function toggleBubble() {
+        if (mirrorOpen && mirrorBubble) { mirrorOpen = false; return; }
+        mirrorBubble = true;
+        mirrorOpen = true;
+    }
     function closeAll() {
+        if (!mirrorBubble && !mirrorRecording) mirrorOpen = false;
         ccOpen = false;
         launcherOpen = false;
         wallsOpen = false;
@@ -59,5 +129,13 @@ Singleton {
         overviewOpen = false;
         devOpen = false;
         captureOpen = false;
+        powerOpen = false;
+        radarOpen = false;
+        notifOpen = false;
+        mediaOpen = false;
+        audioOpen = false;
+        gpuOpen = false;
+        clipOpen = false;
+        focusOpen = false;
     }
 }

@@ -147,7 +147,7 @@ PanelWindow {
                 const out = [];
                 for (const l of text.split("\n")) {
                     const f = l.split("\t");
-                    if (f[0] === "#editor") { launcher.editor = f[1]; continue; }
+                    if (f[0] === "#editor") { launcher.editor = Settings.o.editor || f[1]; continue; }
                     if (f.length < 5) continue;
                     out.push({ name: f[0], path: f[1], branch: f[2], dirty: f[3] === "1", ts: Number(f[4]), lang: f[5] || "" });
                 }

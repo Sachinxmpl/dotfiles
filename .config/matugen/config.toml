@@ -23,3 +23,45 @@ post_hook   = "pkill -USR1 -x kitty || true"
 input_path  = "~/.config/matugen/templates/starship.toml"
 output_path = "~/.config/starship.toml"
 
+
+# ---- apps ---------------------------------------------------------------
+# VS Code: the "Aurora (wallpaper)" theme extension reloads this file live
+[templates.vscode]
+input_path  = "~/.config/matugen/templates/vscode-theme.json"
+output_path = "~/.cache/aurora/vscode-theme.json"
+post_hook   = "$HOME/.local/bin/aurora-theme-sync >/dev/null 2>&1 || true"
+
+[templates.btop]
+input_path  = "~/.config/matugen/templates/btop.theme"
+output_path = "~/.config/btop/themes/aurora.theme"
+post_hook   = "pkill -USR2 -x btop || true"
+
+# fish syntax colours + fzf, as universal variables (open shells update instantly)
+[templates.fish]
+input_path  = "~/.config/matugen/templates/fish-colors.fish"
+output_path = "~/.config/fish/aurora-colors.fish"
+post_hook   = "fish -c 'source ~/.config/fish/aurora-colors.fish' >/dev/null 2>&1 || true"
+
+# GTK 3 / 4 (Nautilus, file pickers, Brave in GTK mode); apps pick it up when reopened
+[templates.gtk3]
+input_path  = "~/.config/matugen/templates/gtk-colors.css"
+output_path = "~/.config/gtk-3.0/aurora-colors.css"
+
+[templates.gtk4]
+input_path  = "~/.config/matugen/templates/gtk-colors.css"
+output_path = "~/.config/gtk-4.0/aurora-colors.css"
+
+# KDE apps (Okular, Dolphin, Kate…) outside Plasma read their colours from kdeglobals
+[templates.kdeglobals]
+input_path  = "~/.config/matugen/templates/kdeglobals"
+output_path = "~/.config/kdeglobals"
+
+[templates.kde-scheme]
+input_path  = "~/.config/matugen/templates/kdeglobals"
+output_path = "~/.local/share/color-schemes/Aurora.colors"
+
+# Neovim (LazyVim): colorscheme "aurora"; open editors reload it instantly
+[templates.nvim]
+input_path  = "~/.config/matugen/templates/nvim-aurora.lua"
+output_path = "~/.config/nvim/colors/aurora.lua"
+post_hook   = "$HOME/.local/bin/aurora-nvim-reload"

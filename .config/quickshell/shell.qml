@@ -27,6 +27,37 @@ ShellRoot {
     Overview {}
     DevPanel {}
     Capture {}
+    SettingsWindow {}
+    PowerMenu {}
+    Radar {}
+    Switcher { id: switcherWin }
+    NotifCenter {}
+    Media {}
+    AudioPanel {}
+    GpuPanel {}
+    Clip {}
+    FocusPanel {}
+
+    // webcam mirror: only loaded while open, so the camera (and its light) is off otherwise.
+    // Loaded by file name so a missing Qt Multimedia can't break the rest of the shell.
+    LazyLoader {
+        id: mirrorLoader
+        active: Panels.mirrorOpen || Panels.mirrorRecording
+        source: "Mirror.qml"
+    }
+    Connections {
+        target: Panels
+        function onMirrorOpenChanged() { if (Panels.mirrorOpen) mirrorCheck.restart() }
+    }
+    Timer {
+        id: mirrorCheck
+        interval: 1500
+        onTriggered: if (Panels.mirrorOpen && !mirrorLoader.item) {
+            Panels.mirrorOpen = false;
+            Quickshell.execDetached(["notify-send", "-a", "Camera", "-i", "camera-web", "Mirror needs Qt Multimedia",
+                                     "sudo pacman -S --needed qt6-multimedia qt6-multimedia-ffmpeg"]);
+        }
+    }
 
     // pop-ups
     Toasts {}
@@ -54,8 +85,18 @@ ShellRoot {
     //   qs ipc call overview toggle | open | close
     //   qs ipc call dev toggle | open | close
     //   qs ipc call capture toggle | open | close
+    //   qs ipc call settings toggle | open | close
+    //   qs ipc call power toggle | open | close | profile <name> | cycle
+    //   qs ipc call radar wifi | bt | close
+    //   qs ipc call switcher next | prev | commit | cancel
     //   qs ipc call osd brightness | volume
-    //   qs ipc call notifs dnd | clear
+    //   qs ipc call notifs toggle | open | dnd | clear
+    //   qs ipc call media toggle | open | close
+    //   qs ipc call mirror toggle | bubble | close
+    //   qs ipc call audio toggle | close
+    //   qs ipc call gpu toggle | close
+    //   qs ipc call clip toggle | close
+    //   qs ipc call focus toggle | start <tag> | pause | panel | status
     //   qs ipc call night toggle | on | auto | off | cycle | warmer | cooler
     IpcHandler {
         target: "cc"
@@ -116,8 +157,74 @@ ShellRoot {
         function close(): void { Panels.captureOpen = false }
     }
     IpcHandler {
+        target: "settings"
+        function toggle(): void { Panels.closeAll(); Settings.windowOpen = !Settings.windowOpen }
+        function open(): void { Panels.closeAll(); Settings.windowOpen = true }
+        function close(): void { Settings.windowOpen = false }
+    }
+    IpcHandler {
+        target: "power"
+        function toggle(): void { Settings.windowOpen = false; Panels.togglePower() }
+        function open(): void { Settings.windowOpen = false; Panels.closeAll(); Panels.powerOpen = true }
+        function close(): void { Panels.powerOpen = false }
+        function profile(name: string): void { Power.setProfile(name) }
+        function cycle(): void { Power.cycleProfile() }
+    }
+    IpcHandler {
+        target: "radar"
+        function wifi(): void { Settings.windowOpen = false; Panels.toggleRadar("wifi") }
+        function bt(): void { Settings.windowOpen = false; Panels.toggleRadar("bt") }
+        function close(): void { Panels.radarOpen = false }
+    }
+    IpcHandler {
+        target: "switcher"
+        function next(): void { switcherWin.step(1) }
+        function prev(): void { switcherWin.step(-1) }
+        function commit(): void { switcherWin.commit() }
+        function cancel(): void { switcherWin.cancel() }
+    }
+    IpcHandler {
         target: "notifs"
+        function toggle(): void { Settings.windowOpen = false; Panels.toggleNotif() }
+        function open(): void { Settings.windowOpen = false; Panels.closeAll(); Panels.notifOpen = true }
         function dnd(): void { Notifs.dnd = !Notifs.dnd }
         function clear(): void { Notifs.clearAll() }
+    }
+    IpcHandler {
+        target: "media"
+        function toggle(): void { Settings.windowOpen = false; Panels.toggleMedia() }
+        function open(): void { Settings.windowOpen = false; Panels.closeAll(); Panels.mediaOpen = true }
+        function close(): void { Panels.mediaOpen = false }
+    }
+    IpcHandler {
+        target: "mirror"
+        function toggle(): void { Settings.windowOpen = false; Panels.toggleMirror() }
+        function bubble(): void { Panels.toggleBubble() }
+        function close(): void { Panels.mirrorOpen = false }
+    }
+    IpcHandler {
+        target: "audio"
+        function toggle(): void { Settings.windowOpen = false; Panels.toggleAudio() }
+        function close(): void { Panels.audioOpen = false }
+    }
+    IpcHandler {
+        target: "gpu"
+        function toggle(): void { Settings.windowOpen = false; Panels.toggleGpu() }
+        function close(): void { Panels.gpuOpen = false }
+    }
+    IpcHandler {
+        target: "clip"
+        function toggle(): void { Settings.windowOpen = false; Panels.toggleClip() }
+        function close(): void { Panels.clipOpen = false }
+    }
+    IpcHandler {
+        target: "focus"
+        function toggle(): void { Focus.toggle() }
+        function start(tag: string): void { Focus.start(tag) }
+        function pause(): void { Focus.pause() }
+        function panel(): void { Settings.windowOpen = false; Panels.toggleFocus() }
+        function status(): string {
+            return (Focus.running ? (Focus.idle ? "away" : "focus") : "paused") + " " + Focus.tag + " " + Focus.fmt(Focus.total);
+        }
     }
 }

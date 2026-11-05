@@ -66,7 +66,9 @@ PanelWindow {
         property string subtitle
         property string icon
         property bool on: false
+        property bool hasMore: false          // shows a › that opens a detail panel
         signal toggled()
+        signal more()
         Layout.fillWidth: true
         implicitHeight: 58
         radius: 14
@@ -76,7 +78,7 @@ PanelWindow {
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 13
-            anchors.rightMargin: 10
+            anchors.rightMargin: tile.hasMore ? 36 : 10
             spacing: 10
             Icon {
                 text: tile.icon
@@ -107,7 +109,22 @@ PanelWindow {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: tile.toggled()
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: mouse => mouse.button === Qt.RightButton && tile.hasMore ? tile.more() : tile.toggled()
+        }
+        Rectangle {
+            visible: tile.hasMore
+            anchors { right: parent.right; top: parent.top; bottom: parent.bottom; margins: 6 }
+            width: 26
+            radius: 9
+            color: moreArea.containsMouse ? (tile.on ? Theme.alpha(Theme.bg, 0.18) : Theme.hover) : "transparent"
+            Text {
+                anchors.centerIn: parent
+                text: "\u203a"
+                font.pixelSize: 18
+                color: tile.on ? Theme.bg : Theme.muted
+            }
+            MouseArea { id: moreArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: tile.more() }
         }
     }
 
@@ -117,7 +134,9 @@ PanelWindow {
         property string icon
         property real value: 0          // 0..1
         property color fill: Theme.text
+        property bool hasMore: false    // › at the end (volume: pick the output)
         signal moved(real v)
+        signal more()
         spacing: 12
         Layout.fillWidth: true
 
@@ -163,6 +182,13 @@ PanelWindow {
             color: Theme.muted
             horizontalAlignment: Text.AlignRight
             Layout.preferredWidth: 26
+        }
+        Rectangle {
+            visible: srow.hasMore
+            implicitWidth: 24; implicitHeight: 24; radius: 6
+            color: moreArea.containsMouse ? Theme.hover : "transparent"
+            Icon { anchors.centerIn: parent; text: "›"; font.pixelSize: 16; color: Theme.muted }
+            MouseArea { id: moreArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: srow.more() }
         }
     }
 
@@ -306,6 +332,10 @@ PanelWindow {
                     Label { text: "arch · up " + cc.uptime; font.pixelSize: 11; color: Theme.muted }
                 }
                 RoundButton {
+                    icon: "\uf013"
+                    onClicked: { Panels.closeAll(); Settings.windowOpen = true }   // Aurora Settings (Super+,)
+                }
+                RoundButton {
                     icon: "󰸉"
                     onClicked: { Panels.closeAll(); Panels.wallsOpen = true }   // wallpaper picker (Super+W)
                 }
@@ -367,6 +397,8 @@ PanelWindow {
                     on: Networking.wifiEnabled
                     subtitle: !Networking.wifiEnabled ? "Off" : (cc.wifiNetwork ? cc.wifiNetwork.name : "Not connected")
                     onToggled: Networking.wifiEnabled = !Networking.wifiEnabled
+                    hasMore: true
+                    onMore: Panels.toggleRadar("wifi")
                 }
                 Tile {
                     icon: ""
@@ -374,6 +406,8 @@ PanelWindow {
                     on: cc.btAdapter !== null && cc.btAdapter.enabled
                     subtitle: !on ? "Off" : (cc.btDevice ? cc.btDevice.name : "On")
                     onToggled: if (cc.btAdapter) cc.btAdapter.enabled = !cc.btAdapter.enabled
+                    hasMore: true
+                    onMore: Panels.toggleRadar("bt")
                 }
                 Tile {
                     icon: ""
@@ -431,6 +465,8 @@ PanelWindow {
                     onMoved: v => NightLight.temp = Math.round((NightLight.maxTemp - v * (NightLight.maxTemp - NightLight.minTemp)) / 50) * 50
                 }
                 SliderRow {
+                    hasMore: true
+                    onMore: Panels.toggleAudio()
                     icon: (cc.sinkReady && cc.sink.audio.muted) ? "" : ""
                     value: cc.sinkReady ? cc.sink.audio.volume : 0
                     fill: (cc.sinkReady && cc.sink.audio.muted) ? Theme.dim : Theme.text

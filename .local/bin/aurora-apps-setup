@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-apps-setup  ·  one-time setup so apps follow the wallpaper colours
+# Safe to run again. Afterwards every wallpaper change (Super+W) recolours:
+#   VS Code · btop · fish + fzf · GTK apps (Nautilus, file dialogs) · kitty · starship
+set -u
+say() { printf '\033[36m::\033[0m %s\n' "$*"; }
+
+# ---- GTK: import the generated colours
+for v in 3.0 4.0; do
+    css="$HOME/.config/gtk-$v/gtk.css"
+    mkdir -p "$(dirname "$css")"
+    touch "$css"
+    grep -q "aurora-colors.css" "$css" || { printf "@import 'aurora-colors.css';\n" | cat - "$css" > "$css.tmp" && mv "$css.tmp" "$css"; }
+done
+say "GTK: ~/.config/gtk-{3,4}.0/gtk.css import aurora-colors.css"
+
+# ---- btop: use the aurora theme
+conf="$HOME/.config/btop/btop.conf"
+mkdir -p "$HOME/.config/btop/themes"
+if [ -f "$conf" ]; then
+    if grep -q '^color_theme' "$conf"; then sed -i 's|^color_theme *=.*|color_theme = "aurora"|' "$conf"
+    else echo 'color_theme = "aurora"' >> "$conf"; fi
+else
+    printf 'color_theme = "aurora"\ntheme_background = True\n' > "$conf"
+fi
+say "btop: color_theme = aurora"
+
+# ---- fish: drop the old fixed colours from config.fish (they'd hide the generated ones)
+fc="$HOME/.config/fish/config.fish"
+if [ -f "$fc" ] && grep -q '^# ---- Aurora syntax colors ----' "$fc"; then
+    cp "$fc" "$fc.bak"
+    sed -i '/^# ---- Aurora syntax colors ----/,/^set -gx FZF_DEFAULT_OPTS/d' "$fc"
+    printf '\n# colours + fzf follow the wallpaper: matugen writes ~/.config/fish/aurora-colors.fish (universal vars)\n' >> "$fc"
+    say "fish: removed fixed colours (backup: config.fish.bak)"
+fi
+
+# ---- VS Code / VSCodium: install the live theme extension
+vsix="$HOME/.local/share/aurora/aurora-wallpaper-theme.vsix"
+installed=0
+for c in code codium code-oss; do
+    if command -v "$c" >/dev/null; then
+        "$c" --install-extension "$vsix" --force >/dev/null 2>&1 && { say "$c: installed theme 'Aurora (wallpaper)'"; installed=1; }
+    fi
+done
+[ "$installed" = 1 ] || say "VS Code not found, skipped the editor theme"
+
+# ---- generate everything from the current wallpaper
+w=$(cat "$HOME/.cache/aurora/wallpaper.path" 2>/dev/null)
+if [ -f "$w" ]; then
+    say "recolouring from $(basename "$w") …"
+    "$HOME/.local/bin/aurora-wall" "$w"
+fi
+"$HOME/.local/bin/aurora-theme-sync"
+
+cat <<'MSG'
+
+done. two clicks left:
+  • VS Code: Ctrl+K Ctrl+T → "Aurora (wallpaper)"   (it then updates live with every wallpaper)
+  • Brave:   Settings → Appearance → Theme → GTK      (toolbar follows the wallpaper too)
+  GTK apps like Nautilus pick up new colours the next time they open.
+MSG

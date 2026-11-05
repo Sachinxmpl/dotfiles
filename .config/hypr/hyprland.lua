@@ -2,11 +2,17 @@
 -- Aurora rice · stage 1: clean base (Hyprland 0.56, Lua config)
 -- Edit + save = Hyprland reloads automatically. Errors show as a red bar at the top.
 
+-- Options from the Aurora Settings window (Super+,). That window writes
+-- ~/.config/hypr/aurora-settings.lua; every value below falls back to a default.
+local okS, S = pcall(require, "aurora-settings")
+if not okS or type(S) ~= "table" then S = {} end
+local function opt(v, default) if v == nil then return default end return v end
+
 ------------------
 ---- MONITORS ----
 ------------------
--- Laptop panel at 144 Hz
-hl.monitor({ output = "eDP-1", mode = "1920x1080@144", position = "0x0", scale = "1" })
+-- Laptop panel (refresh rate + scale from Settings → Display)
+hl.monitor({ output = "eDP-1", mode = "1920x1080@" .. opt(S.refresh_rate, 144), position = "0x0", scale = tostring(opt(S.scale, 1)) })
 -- Anything else plugged in (HDMI etc.): sensible defaults, placed to the right
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "1" })
 
@@ -14,8 +20,9 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "1" })
 ---------------------
 ---- MY PROGRAMS ----
 ---------------------
-local terminal = "kitty"
-local browser  = "firefox"
+local terminal = opt(S.terminal, "kitty")       -- Settings → Apps
+local browser  = opt(S.browser, "brave")
+local files    = opt(S.files, "nautilus")
 local menu     = "qs ipc call launcher toggle"   -- Aurora launcher (Super+Space)
 
 
@@ -34,9 +41,9 @@ hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
 hl.env("QT_LOGGING_RULES", "qt.qpa.wayland.textinput=false")
 
 -- NVIDIA (kept from your old config, since it works)
--- hl.env("LIBVA_DRIVER_NAME", "nvidia")
--- hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
--- hl.env("NVD_BACKEND", "direct")
+-- hl.env("LIBVA_DRIVER_NAME", "nvidia")   -- off: hybrid laptop, apps render on the iGPU (run games with prime-run)
+-- hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")   -- off: hybrid laptop, apps render on the iGPU (run games with prime-run)
+-- hl.env("NVD_BACKEND", "direct")   -- off: hybrid laptop, apps render on the iGPU (run games with prime-run)
 
 
 -------------------
@@ -59,47 +66,49 @@ end)
 -- Border colours follow the wallpaper: matugen writes ~/.config/hypr/colors.lua.
 -- Without that file, the original Aurora teal → sky gradient is used.
 local okColors, wal = pcall(require, "colors")
-if not okColors or type(wal) ~= "table" then wal = {} end
+if not okColors or type(wal) ~= "table" or S.color_source == "static" then wal = {} end
 local borderA  = wal.active_a or "rgba(6ee7c8ee)"
 local borderB  = wal.active_b or "rgba(7cc4ffee)"
 local borderIn = wal.inactive or "rgba(1b2235aa)"
 
 hl.config({
     general = {
-        gaps_in  = 2,     -- 4px between windows
-        gaps_out = 0,     -- windows touch the screen edges and the bar
-        border_size = 2,
+        gaps_in  = opt(S.gaps_in, 2),        -- between windows
+        gaps_out = opt(S.gaps_out, 0),       -- to the screen edges / bar
+        border_size = opt(S.border_size, 2),
         col = {
             active_border   = { colors = { borderA, borderB }, angle = 45 },
             inactive_border = borderIn,
         },
         resize_on_border = true,
         allow_tearing    = false,
-        layout = "dwindle",
+        layout = opt(S.layout, "dwindle"),
     },
 
     decoration = {
-        rounding       = 10,
+        rounding       = opt(S.rounding, 10),
         rounding_power = 2,
         active_opacity   = 1.0,
-        inactive_opacity = 0.96,
+        inactive_opacity = opt(S.inactive_opacity, 0.96),
+        dim_inactive     = opt(S.dim_inactive, false),
+        dim_strength     = 0.12,
 
         shadow = {
-            enabled      = true,
+            enabled      = opt(S.shadow, true),
             range        = 18,
             render_power = 3,
             color        = 0x66000000,
         },
 
         blur = {
-            enabled  = true,
-            size     = 6,
-            passes   = 3,
+            enabled  = opt(S.blur, true),
+            size     = opt(S.blur_size, 6),
+            passes   = opt(S.blur_passes, 3),
             vibrancy = 0.17,
         },
     },
 
-    animations = { enabled = true },
+    animations = { enabled = opt(S.animations, true) },
 
     cursor = {
         no_hardware_cursors = true,   -- NVIDIA cursor lag fix (from your old config)
@@ -116,18 +125,26 @@ hl.config({
     },
 
     misc = {
+        vrr = opt(S.vrr, 0),
         force_default_wallpaper = 0,
         disable_hyprland_logo   = true,
         disable_splash_rendering = true,
     },
 
     input = {
-        kb_layout    = "us",
+        kb_layout    = opt(S.kb_layout, "us"),
+        kb_options   = opt(S.kb_options, ""),
+        repeat_rate  = opt(S.repeat_rate, 25),
+        repeat_delay = opt(S.repeat_delay, 600),
         follow_mouse = 1,
-        sensitivity  = 0,
+        sensitivity  = opt(S.sensitivity, 0),
+        accel_profile = opt(S.flat_accel, false) and "flat" or "",
         touchpad = {
-            natural_scroll = true,
-            tap_to_click   = true,
+            natural_scroll       = opt(S.natural_scroll, true),
+            tap_to_click         = opt(S.tap_to_click, true),
+            disable_while_typing = opt(S.disable_while_typing, true),
+            scroll_factor        = opt(S.scroll_factor, 1.0),
+            clickfinger_behavior = opt(S.click_finger, true),   -- two-finger click = right click
         },
     },
 })
@@ -140,29 +157,35 @@ hl.curve("almostLinear",   { type = "bezier", points = { {0.5, 0.5},   {0.75, 1}
 hl.curve("quick",          { type = "bezier", points = { {0.15, 0},    {0.1, 1}     } })
 hl.curve("easy",           { type = "spring", mass = 1, stiffness = 238.1191, dampening = 24.21279333 })
 
-hl.animation({ leaf = "global",        enabled = true,  speed = 10,   bezier = "default" })
-hl.animation({ leaf = "border",        enabled = true,  speed = 5.39, bezier = "easeOutQuint" })
-hl.animation({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "easy" })
-hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "easy",         style = "popin 87%" })
-hl.animation({ leaf = "windowsOut",    enabled = true,  speed = 1.49, bezier = "linear",       style = "popin 87%" })
-hl.animation({ leaf = "fadeIn",        enabled = true,  speed = 1.73, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeOut",       enabled = true,  speed = 1.46, bezier = "almostLinear" })
-hl.animation({ leaf = "fade",          enabled = true,  speed = 3.03, bezier = "quick" })
-hl.animation({ leaf = "layers",        enabled = true,  speed = 3.81, bezier = "easeOutQuint" })
-hl.animation({ leaf = "layersIn",      enabled = true,  speed = 4,    bezier = "easeOutQuint", style = "fade" })
-hl.animation({ leaf = "layersOut",     enabled = true,  speed = 1.5,  bezier = "linear",       style = "fade" })
-hl.animation({ leaf = "fadeLayersIn",  enabled = true,  speed = 1.79, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeLayersOut", enabled = true,  speed = 1.39, bezier = "almostLinear" })
-hl.animation({ leaf = "workspaces",    enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesIn",  enabled = true,  speed = 1.21, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesOut", enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
+-- Settings → Windows → animation speed scales every speed below (0.5 = twice as fast)
+local animSpeed = opt(S.anim_speed, 1.0)
+local function anim(t) if t.speed then t.speed = t.speed * animSpeed end hl.animation(t) end
+
+anim({ leaf = "global",        enabled = true,  speed = 10,   bezier = "default" })
+anim({ leaf = "border",        enabled = true,  speed = 5.39, bezier = "easeOutQuint" })
+anim({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "easy" })
+anim({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "easy",         style = "popin 87%" })
+anim({ leaf = "windowsOut",    enabled = true,  speed = 1.49, bezier = "linear",       style = "popin 87%" })
+anim({ leaf = "fadeIn",        enabled = true,  speed = 1.73, bezier = "almostLinear" })
+anim({ leaf = "fadeOut",       enabled = true,  speed = 1.46, bezier = "almostLinear" })
+anim({ leaf = "fade",          enabled = true,  speed = 3.03, bezier = "quick" })
+anim({ leaf = "layers",        enabled = true,  speed = 3.81, bezier = "easeOutQuint" })
+anim({ leaf = "layersIn",      enabled = true,  speed = 4,    bezier = "easeOutQuint", style = "fade" })
+anim({ leaf = "layersOut",     enabled = true,  speed = 1.5,  bezier = "linear",       style = "fade" })
+anim({ leaf = "fadeLayersIn",  enabled = true,  speed = 1.79, bezier = "almostLinear" })
+anim({ leaf = "fadeLayersOut", enabled = true,  speed = 1.39, bezier = "almostLinear" })
+anim({ leaf = "workspaces",    enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
+anim({ leaf = "workspacesIn",  enabled = true,  speed = 1.21, bezier = "almostLinear", style = "fade" })
+anim({ leaf = "workspacesOut", enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
 
 -- Touchpad: 3-finger swipe left/right switches workspace
-hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+if opt(S.swipe, true) then
+    hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+end
 
 -- Workspaces 1-5 always exist (even when empty), so swiping and the bar
 -- can always reach them. Without this, an empty workspace disappears.
-for i = 1, 5 do
+for i = 1, opt(S.workspaces, 5) do
     hl.workspace_rule({ workspace = tostring(i), persistent = true })
 end
 
@@ -174,12 +197,12 @@ local mod = "SUPER"
 
 -- Apps
 hl.bind(mod .. " + Return",    hl.dsp.exec_cmd(terminal))
-hl.bind(mod .. " + E",         hl.dsp.exec_cmd("nautilus --new-window"))         -- files (Nautilus)
+hl.bind(mod .. " + E",         hl.dsp.exec_cmd(files))                            -- files (Nautilus)
 hl.bind(mod .. " + B",         hl.dsp.exec_cmd(browser))
 hl.bind(mod .. " + Space",     hl.dsp.exec_cmd(menu))
 hl.bind("SUPER + Super_L",     hl.dsp.exec_cmd(menu), { release = true })   -- tap Super alone
 hl.bind(mod .. " + A",         hl.dsp.exec_cmd("qs ipc call cc toggle"))   -- control centre
-hl.bind(mod .. " + V",         hl.dsp.exec_cmd("qs ipc call launcher mode ';'"))   -- clipboard history
+hl.bind(mod .. " + V",         hl.dsp.exec_cmd("qs ipc call clip toggle"))   -- clipboard history (preview, pins)
 hl.bind(mod .. " + O",         hl.dsp.exec_cmd("qs ipc call launcher mode '~'"))   -- open a git project
 hl.bind(mod .. " + period",    hl.dsp.exec_cmd("qs ipc call launcher mode ':'"))   -- emoji & symbols
 hl.bind(mod .. " + slash",     hl.dsp.exec_cmd("qs ipc call launcher mode '?'"))   -- web / docs search
@@ -188,6 +211,7 @@ hl.bind(mod .. " + N",         hl.dsp.exec_cmd("qs ipc call night toggle"))  -- 
 hl.bind(mod .. " + SHIFT + N", hl.dsp.exec_cmd("qs ipc call night auto"))    -- night light: sunset → sunrise
 hl.bind(mod .. " + ALT + N",   hl.dsp.exec_cmd("qs ipc call night warmer"))  -- warmer (Super+Ctrl+N cooler)
 hl.bind(mod .. " + CTRL + N",  hl.dsp.exec_cmd("qs ipc call night cooler"))
+hl.bind(mod .. " + comma",     hl.dsp.exec_cmd("qs ipc call settings toggle"))  -- Aurora Settings
 hl.bind(mod .. " + D",         hl.dsp.exec_cmd("qs ipc call dash toggle"))   -- dashboard
 hl.bind(mod .. " + W",         hl.dsp.exec_cmd("qs ipc call walls toggle"))  -- wallpaper picker
 hl.bind(mod .. " + SHIFT + W", hl.dsp.exec_cmd("$HOME/.local/bin/aurora-wall --random"))      -- random wallpaper
@@ -199,7 +223,21 @@ hl.bind(mod .. " + F",         hl.dsp.window.fullscreen({ action = "toggle" }))
 hl.bind(mod .. " + M",         hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }))
 hl.bind(mod .. " + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mod .. " + J",         hl.dsp.layout("togglesplit"))
-hl.bind(mod .. " + SHIFT + E", hl.dsp.exit())
+hl.bind(mod .. " + SHIFT + E", hl.dsp.exec_cmd("qs ipc call power toggle"))   -- power menu (logout is in there)
+-- Alt+Tab window switcher: tap = previous window, hold Alt + tap Tab = pick from previews
+hl.bind("ALT + Tab",         hl.dsp.exec_cmd("qs ipc call switcher next"), { repeating = true })
+hl.bind("ALT + SHIFT + Tab", hl.dsp.exec_cmd("qs ipc call switcher prev"), { repeating = true })
+hl.bind("ALT + Alt_L",       hl.dsp.exec_cmd("qs ipc call switcher commit"), { release = true })
+hl.bind(mod .. " + grave",     hl.dsp.exec_cmd("qs ipc call notifs toggle"))  -- notification centre
+hl.bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("qs ipc call media toggle"))   -- media panel
+hl.bind(mod .. " + SHIFT + A", hl.dsp.exec_cmd("qs ipc call audio toggle"))   -- audio output picker
+hl.bind(mod .. " + T",         hl.dsp.exec_cmd("qs ipc call focus toggle"))   -- focus timer: start / pause
+hl.bind(mod .. " + SHIFT + T", hl.dsp.exec_cmd("qs ipc call focus panel"))    -- focus timer: today's details
+hl.bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd("qs ipc call mirror toggle"))  -- webcam mirror
+hl.bind(mod .. " + CTRL + C",  hl.dsp.exec_cmd("qs ipc call mirror bubble"))  -- webcam bubble (floats over everything)
+hl.bind(mod .. " + I",         hl.dsp.exec_cmd("qs ipc call radar wifi"))    -- wifi radar
+hl.bind(mod .. " + SHIFT + I", hl.dsp.exec_cmd("qs ipc call radar bt"))      -- bluetooth radar
+hl.bind(mod .. " + Escape",    hl.dsp.exec_cmd("qs ipc call power toggle"))   -- power menu
 
 -- Focus / move with arrows
 for _, d in ipairs({ "left", "right", "up", "down" }) do
@@ -290,7 +328,7 @@ hl.layer_rule({
 -- Aurora panels animate themselves; skip Hyprland's own fade so they feel snappy
 hl.layer_rule({
     name  = "aurora-no-anim",
-    match = { namespace = "^(launcher|aurora-cc|scrim|walls|dash|overview|devpanel|capture)$" },
+    match = { namespace = "^(launcher|aurora-cc|scrim|walls|dash|overview|devpanel|capture|settings|power|radar|switcher|notifcenter|media|mirror|audio|gpu|clip|focus)$" },
     no_anim = true,
 })
 

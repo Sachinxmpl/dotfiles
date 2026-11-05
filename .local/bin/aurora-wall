@@ -12,7 +12,8 @@ set -u
 WALLDIR="${AURORA_WALLDIR:-$HOME/wallpapers}"
 CACHE="$HOME/.cache/aurora"
 LAST="$CACHE/wallpaper.path"
-SCHEME="${AURORA_SCHEME:-scheme-vibrant}"   # or: scheme-content (closer to the image) · scheme-tonal-spot (calmer)
+SCHEME="${AURORA_SCHEME:-$(jq -r '.scheme // empty' "$HOME/.config/aurora/settings.json" 2>/dev/null)}"
+SCHEME="${SCHEME:-scheme-vibrant}"   # or: scheme-content (closer to the image) · scheme-tonal-spot (calmer)
 mkdir -p "$CACHE"
 
 list_walls() {

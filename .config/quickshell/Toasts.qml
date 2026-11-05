@@ -11,7 +11,7 @@ import Quickshell.Services.Notifications
 PanelWindow {
     id: toasts
 
-    visible: Notifs.popups.length > 0 && !Panels.ccOpen
+    visible: Notifs.popups.length > 0 && !Panels.ccOpen && !Panels.notifOpen
     anchors { top: true; right: true }
     margins { top: 6; right: 6 }
     exclusiveZone: 0

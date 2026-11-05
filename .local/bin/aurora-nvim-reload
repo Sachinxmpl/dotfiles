@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# ~/.local/bin/aurora-nvim-reload  ·  tell every running Neovim to reload the Aurora colours (run by matugen)
+dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+for s in "$dir"/nvim.*.0; do
+    [ -S "$s" ] || continue
+    timeout 2 nvim --server "$s" --remote-expr 'execute("if get(g:, \"colors_name\", \"\") ==# \"aurora\" | silent! colorscheme aurora | endif")' >/dev/null 2>&1
+done
+exit 0

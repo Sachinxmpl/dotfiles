@@ -26,7 +26,7 @@ Singleton {
         try { return JSON.parse(t); } catch (e) { return ({}); }
     }
     // m.key, or the Aurora default when there is no colors.json
-    function pick(key, fallback) { return m[key] !== undefined ? m[key] : fallback; }
+    function pick(key, fallback) { return Settings.o.colorSource !== "static" && m[key] !== undefined ? m[key] : fallback; }
 
     // same colour with a different opacity:  Theme.alpha(Theme.accent, 0.3)
     function alpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a); }
@@ -37,7 +37,7 @@ Singleton {
     readonly property color card:      pick("card", "#1b2235")             // tiles, tracks, chips
     readonly property color cardHover: pick("cardHover", "#232b42")
     readonly property color cardHi:    pick("cardHi", "#2a3350")           // borders, pressed
-    readonly property color panel:     alpha(pick("panel", "#0a0e18"), 0.72)  // the bar
+    readonly property color panel:     alpha(pick("panel", "#0a0e18"), Settings.o.barOpacity)  // the bar
     readonly property color well:      alpha(bg, 0.60)
     readonly property color hover:     alpha(text, 0.08)
     readonly property color border:    alpha(text, 0.09)
@@ -63,13 +63,13 @@ Singleton {
     readonly property color gradB:   pick("tertiaryContainer", "#6b4fbf")
 
     // ---- type --------------------------------------------------------------
-    readonly property string font:     "Inter"
-    readonly property string iconFont: "JetBrainsMono Nerd Font"
+    readonly property string font:     Settings.o.uiFont
+    readonly property string iconFont: Settings.o.monoFont
     readonly property string mono:     iconFont                     // code-ish text: bar, paths, numbers
-    readonly property int    fontSize: 12
+    readonly property int    fontSize: Math.round(12 * Settings.o.fontScale)
 
     // ---- shape -------------------------------------------------------------
-    readonly property int barHeight: 44
-    readonly property int radius:    14
-    readonly property int radiusSm:  10
+    readonly property int barHeight: Settings.o.barHeight
+    readonly property int radius:    Settings.o.radius
+    readonly property int radiusSm:  Math.max(0, Settings.o.radius - 4)
 }

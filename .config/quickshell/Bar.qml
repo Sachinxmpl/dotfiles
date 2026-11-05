@@ -1,7 +1,7 @@
 // Aurora top bar: glass strip with grouped segments
 //   left:   launcher · workspaces · active window
 //   centre: date · clock · now playing
-//   right:  wifi · bluetooth · volume · battery | notifications · control centre
+//   right:  wifi · bluetooth · volume · battery | notifications · control centre · power
 
 import QtQuick
 import QtQuick.Layouts
@@ -76,7 +76,7 @@ PanelWindow {
     }
 
     // ------------------------------------------------------------ data
-    SystemClock { id: clock; precision: SystemClock.Minutes }
+    SystemClock { id: clock; precision: Settings.o.clockSeconds ? SystemClock.Seconds : SystemClock.Minutes }
 
     // audio: track the default output so volume/mute stay live
     readonly property var sink: Pipewire.defaultAudioSink
@@ -107,7 +107,8 @@ PanelWindow {
 
     // workspaces: always show 1-5, plus any higher one that exists
     readonly property var workspaceIds: {
-        const ids = [1, 2, 3, 4, 5];
+        const ids = [];
+        for (let i = 1; i <= Settings.o.workspaces; i++) ids.push(i);      // Settings → Bar
         for (const ws of Hyprland.workspaces.values)
             if (ws.id > 0 && !ids.includes(ws.id)) ids.push(ws.id);
         return ids.sort((a, b) => a - b);
@@ -232,6 +233,7 @@ PanelWindow {
 
             // active window title
             Label {
+                visible: Settings.o.barTitle
                 Layout.maximumWidth: 360
                 elide: Text.ElideRight
                 color: Theme.muted
@@ -263,7 +265,7 @@ PanelWindow {
                         font.weight: Font.DemiBold
                     }
                     Label {
-                        text: Qt.formatDateTime(clock.date, "HH:mm")
+                        text: Qt.formatDateTime(clock.date, (Settings.o.clock24h ? "HH:mm" : "h:mm") + (Settings.o.clockSeconds ? ":ss" : "") + (Settings.o.clock24h ? "" : " AP"))
                         font.weight: Font.Bold
                         color: Theme.accent
                     }
@@ -279,7 +281,7 @@ PanelWindow {
 
             // now playing pill (only when a player exists)
             Rectangle {
-                visible: bar.player !== null
+                visible: bar.player !== null && Settings.o.barMedia
                 implicitHeight: 28
                 implicitWidth: musicRow.implicitWidth + 18
                 radius: 14
@@ -291,8 +293,28 @@ PanelWindow {
                     anchors.centerIn: parent
                     spacing: 7
 
-                    // little equaliser that dances while playing
+                    // live spectrum from cava (Cava.qml)
                     Row {
+                        visible: Cava.live
+                        spacing: 2
+                        height: 14
+                        Layout.alignment: Qt.AlignVCenter
+                        Repeater {
+                            model: 5
+                            Rectangle {
+                                required property int index
+                                width: 2
+                                radius: 1
+                                color: Theme.accent
+                                height: 2 + 12 * Math.min(1, Cava.band(index, 5) * 1.3)
+                                y: (14 - height) / 2
+                                Behavior on height { NumberAnimation { duration: 60 } }
+                            }
+                        }
+                    }
+                    // without cava: a little equaliser that dances while playing
+                    Row {
+                        visible: !Cava.live
                         spacing: 2
                         height: 14
                         Layout.alignment: Qt.AlignVCenter
@@ -327,9 +349,10 @@ PanelWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    // left: play/pause · right: next track
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                    // left: media panel · middle: play/pause · right: next track
                     onClicked: mouse => {
+                        if (mouse.button === Qt.LeftButton) { Panels.toggleMedia(); return; }
                         if (!bar.player) return;
                         if (mouse.button === Qt.RightButton) bar.player.next();
                         else bar.player.togglePlaying();
@@ -387,6 +410,7 @@ PanelWindow {
 
             // system: cpu · mem · temp, like a tmux status line → click for the dashboard
             Well {
+                visible: Settings.o.barStats
                 implicitWidth: sysRow.implicitWidth + 22
                 color: sysArea.containsMouse ? Theme.hover : Theme.well
                 Row {
@@ -421,9 +445,81 @@ PanelWindow {
                 }
             }
 
+            // focus timer: today's focused time · click: details · right-click: start / pause
+            Rectangle {
+                id: focusPill
+                objectName: "focusPill"
+                visible: Settings.o.barFocus !== false
+                readonly property color tint: Focus.idle ? Theme.yellow : Theme.accent
+                implicitHeight: 32
+                implicitWidth: focusRow.implicitWidth + 20
+                radius: Theme.radiusSm
+                color: Panels.focusOpen ? Theme.accentSoft : focusArea.containsMouse ? Theme.hover : Focus.running ? Theme.alpha(tint, 0.12) : Theme.well
+                Row {
+                    id: focusRow
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Rectangle {
+                        visible: Focus.running
+                        width: 7; height: 7; radius: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: focusPill.tint
+                    }
+                    Icon { visible: !Focus.running; text: "󰔟"; color: Theme.dim; anchors.verticalCenter: parent.verticalCenter }
+                    Label {
+                        visible: Focus.running || Focus.total >= 60
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Focus.clock(Focus.total)
+                        font.pixelSize: 11
+                        font.features: { "tnum": 1 }
+                        color: Focus.running ? focusPill.tint : Theme.dim
+                    }
+                }
+                MouseArea {
+                    id: focusArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: mouse => { if (mouse.button === Qt.RightButton) Focus.toggle(); else Panels.toggleFocus(); }
+                }
+            }
+
+            // nvidia pill: shown while the dGPU is awake (it costs battery) → click: what's using it
+            Rectangle {
+                id: gpuPill
+                objectName: "gpuPill"
+                readonly property int users: Gpu.procs.filter(p => p.name !== "nvidia-smi").length
+                visible: Gpu.present && (Settings.o.barGpu === "always" || (Settings.o.barGpu !== "off" && Gpu.awake))
+                implicitHeight: 32
+                implicitWidth: gpuRow.implicitWidth + 20
+                radius: Theme.radiusSm
+                color: Panels.gpuOpen ? Theme.accentSoft : gpuArea.containsMouse ? Theme.hover : Gpu.awake ? Theme.alpha(Theme.yellow, 0.12) : Theme.well
+                Row {
+                    id: gpuRow
+                    anchors.centerIn: parent
+                    spacing: 6
+                    Icon { text: "󰢮"; color: Gpu.awake ? Theme.yellow : Theme.dim; anchors.verticalCenter: parent.verticalCenter }
+                    Label {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: Gpu.awake ? (gpuPill.users > 0 ? gpuPill.users : "on") : "zz"
+                        font.pixelSize: 11
+                        color: Gpu.awake ? Theme.yellow : Theme.dim
+                    }
+                }
+                MouseArea {
+                    id: gpuArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Panels.toggleGpu()
+                }
+            }
+
             // dev pill:  branch ● · containers · dev servers  → click for the Dev panel
             Rectangle {
                 id: devPill
+                visible: Settings.o.barDev
                 readonly property int myPorts: Dev.ports.filter(p => p.pid !== "-").length
                 implicitHeight: 32
                 implicitWidth: devRow.implicitWidth + 22
@@ -524,7 +620,7 @@ PanelWindow {
                         }
                     }
 
-                    // network: icon + live down/up speed · click opens nmtui · hover shows the network name
+                    // network: icon + live down/up speed · click opens the wifi radar (right-click: wifi on/off) · hover shows the network name
                     Item {
                         implicitWidth: netRow.implicitWidth
                         implicitHeight: 24
@@ -537,15 +633,19 @@ PanelWindow {
                                 color: (bar.wifiNetwork || bar.wiredUp) ? Theme.subtext : Theme.dim
                                 anchors.verticalCenter: parent.verticalCenter
                             }
-                            Kv { key: "↓"; value: Stats.rate(Stats.rxRate); valueColor: Stats.rxRate > 1048576 ? Theme.accent : Theme.text; anchors.verticalCenter: parent.verticalCenter }
-                            Kv { key: "↑"; value: Stats.rate(Stats.txRate); valueColor: Stats.txRate > 1048576 ? Theme.violet : Theme.text; anchors.verticalCenter: parent.verticalCenter }
+                            Kv { visible: Settings.o.barNet; key: "↓"; value: Stats.rate(Stats.rxRate); valueColor: Stats.rxRate > 1048576 ? Theme.accent : Theme.text; anchors.verticalCenter: parent.verticalCenter }
+                            Kv { visible: Settings.o.barNet; key: "↑"; value: Stats.rate(Stats.txRate); valueColor: Stats.txRate > 1048576 ? Theme.violet : Theme.text; anchors.verticalCenter: parent.verticalCenter }
                         }
                         MouseArea {
                             id: netArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: bar.run(["kitty", "--class", "aurora-float", "-e", "nmtui"])
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: mouse => {
+                                if (mouse.button === Qt.RightButton) Networking.wifiEnabled = !Networking.wifiEnabled;
+                                else Panels.toggleRadar("wifi");
+                            }
                         }
                         // tooltip: ssid · interface
                         Rectangle {
@@ -567,7 +667,7 @@ PanelWindow {
                         }
                     }
 
-                    // bluetooth: click toggles power, teal when a device is connected
+                    // bluetooth: click opens the bluetooth radar (right-click: power on/off) · teal when a device is connected
                     Icon {
                         visible: bar.btAdapter !== null
                         text: ""
@@ -575,11 +675,15 @@ PanelWindow {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: if (bar.btAdapter) bar.btAdapter.enabled = !bar.btAdapter.enabled
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: mouse => {
+                                if (mouse.button === Qt.RightButton) { if (bar.btAdapter) bar.btAdapter.enabled = !bar.btAdapter.enabled; }
+                                else Panels.toggleRadar("bt");
+                            }
                         }
                     }
 
-                    // volume: click mutes, scroll changes
+                    // volume: click picks the output (speakers / HDMI / bluetooth), right-click mutes, scroll changes
                     Item {
                         implicitWidth: volRow.implicitWidth
                         implicitHeight: volRow.implicitHeight
@@ -588,8 +692,9 @@ PanelWindow {
                             anchors.fill: parent
                             spacing: 5
                             Icon {
-                                text: bar.muted ? "" : (bar.volume < 0.4 ? "" : "")
-                                color: bar.muted ? Theme.red : Theme.subtext
+                                readonly property string k: Audio.kind(bar.sink)
+                                text: bar.muted ? "" : k === "speakers" ? (bar.volume < 0.4 ? "" : "") : Audio.icon(k)
+                                color: bar.muted ? Theme.red : k === "hdmi" ? Theme.violet : Theme.subtext
                             }
                             Label {
                                 text: bar.muted ? "muted" : Math.round(bar.volume * 100)
@@ -599,7 +704,11 @@ PanelWindow {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: if (bar.sinkReady) bar.sink.audio.muted = !bar.sink.audio.muted
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                            onClicked: mouse => {
+                                if (mouse.button === Qt.LeftButton) Panels.toggleAudio();
+                                else if (bar.sinkReady) bar.sink.audio.muted = !bar.sink.audio.muted;
+                            }
                             onWheel: wheel => {
                                 if (!bar.sinkReady) return;
                                 const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
@@ -610,8 +719,14 @@ PanelWindow {
 
                     // battery
                     RowLayout {
-                        visible: bar.hasBattery
+                        visible: bar.hasBattery && Settings.o.barBattery
                         spacing: 5
+                        Icon {                                   // power profile when it isn't balanced (right-click the power button cycles)
+                            visible: Power.hasProfiles && Power.profile !== "balanced"
+                            text: Power.profile === "performance" ? "" : ""
+                            color: Power.profile === "performance" ? Theme.yellow : Theme.teal
+                            font.pixelSize: 12
+                        }
                         Icon {
                             text: bar.charging ? ""
                                 : bar.batteryPct > 85 ? ""
@@ -629,17 +744,17 @@ PanelWindow {
                 }
             }
 
-            // notifications: left = open list (control centre) · right = do not disturb
+            // notifications: left = notification centre · right = do not disturb
             IconButton {
-                icon: Notifs.dnd ? "" : ""
-                iconColor: Notifs.dnd ? Theme.dim : Theme.subtext
+                icon: Notifs.quiet ? "" : ""
+                iconColor: Notifs.quiet ? Theme.violet : Theme.subtext
                 onClicked: mouse => {
                     if (mouse.button === Qt.RightButton) Notifs.dnd = !Notifs.dnd;
-                    else Panels.toggleCc();
+                    else Panels.toggleNotif();
                 }
                 // unread badge
                 Rectangle {
-                    visible: Notifs.history.length > 0 && !Notifs.dnd
+                    visible: Notifs.history.length > 0 && !Notifs.quiet
                     anchors { top: parent.top; right: parent.right; topMargin: 4; rightMargin: 4 }
                     width: Math.max(14, badgeText.implicitWidth + 6)
                     height: 14
@@ -663,6 +778,16 @@ PanelWindow {
                 highlighted: true
                 color: Panels.ccOpen ? Theme.alpha(Theme.accent, 0.30) : Theme.accentSoft
                 onClicked: Panels.toggleCc()
+            }
+
+            // power menu (also Super+Esc) · right-click cycles the power profile
+            IconButton {
+                icon: ""
+                iconColor: Panels.powerOpen ? Theme.red : Theme.subtext
+                onClicked: mouse => {
+                    if (mouse.button === Qt.RightButton) Power.cycleProfile();
+                    else Panels.togglePower();
+                }
             }
         }
     }

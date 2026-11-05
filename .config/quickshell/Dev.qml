@@ -94,7 +94,7 @@ Singleton {
     }
     // open a folder in your editor (VS Code / Codium / Zed if installed, else nvim in kitty)
     function openEditor(path) {
-        sh("p=" + q(path) + "; e=${AURORA_EDITOR:-$(for x in code codium code-oss zed nvim vim; do command -v $x >/dev/null && echo $x && break; done)}; " +
+        sh("p=" + q(path) + "; e=${AURORA_EDITOR:-" + q(Settings.o.editor || "") + "}; [ -n \"$e\" ] || e=$(for x in code codium code-oss zed nvim vim; do command -v $x >/dev/null && echo $x && break; done); " +
            "case $e in nvim|vim|vi|hx|helix) kitty --directory \"$p\" $e . ;; *) $e \"$p\" ;; esac");
     }
     function openTerminal(path) { Quickshell.execDetached(["kitty", "--directory", path]) }

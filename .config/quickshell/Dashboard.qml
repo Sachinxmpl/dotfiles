@@ -15,9 +15,9 @@ PanelWindow {
 
     // ---- knobs --------------------------------------------------------------
     // weather location (default: Kathmandu). Find yours on open-meteo.com
-    property real   latitude: 27.7172
-    property real   longitude: 85.3240
-    property string place: "Kathmandu"
+    readonly property real   latitude: Settings.o.latitude     // Settings → Location
+    readonly property real   longitude: Settings.o.longitude
+    readonly property string place: Settings.o.place
     property bool   showGpu: true          // nvidia-smi briefly wakes the dGPU while open
     property real   dim: 0.06
     property int    openMs: 190

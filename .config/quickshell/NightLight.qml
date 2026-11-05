@@ -14,8 +14,8 @@ Singleton {
     id: nl
 
     // ---- knobs (location defaults to Kathmandu; same as the dashboard weather)
-    property real latitude: 27.7172
-    property real longitude: 85.3240
+    readonly property real latitude: Settings.o.latitude      // Settings → Location
+    readonly property real longitude: Settings.o.longitude
     property int  fadeMinutes: 40        // auto mode: how long sunset/sunrise fades take
     readonly property int minTemp: 2500  // warmest allowed
     readonly property int maxTemp: 6000  // coolest still counted as "on"

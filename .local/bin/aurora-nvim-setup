@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# ~/.local/bin/aurora-nvim-setup  ·  one-time: Neovim follows the wallpaper + file manager opens text in nvim
+set -u
+say() { printf '\033[36m::\033[0m %s\n' "$*"; }
+
+[ -d "$HOME/.config/nvim/lua/plugins" ] || { echo "LazyVim isn't set up in ~/.config/nvim yet — install it first."; exit 1; }
+
+# open text / code files in nvim (inside kitty), PDFs in Okular
+mimes=$(grep '^MimeType=' "$HOME/.local/share/applications/nvim-kitty.desktop" | cut -d= -f2 | tr ';' ' ')
+xdg-mime default nvim-kitty.desktop $mimes
+command -v okular >/dev/null && xdg-mime default org.kde.okular.desktop application/pdf
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+say "text & code files → Neovim (kitty) · PDFs → Okular"
+
+# generate the colours from the current wallpaper
+w=$(cat "$HOME/.cache/aurora/wallpaper.path" 2>/dev/null)
+[ -f "$w" ] && { say "recolouring from $(basename "$w") …"; "$HOME/.local/bin/aurora-wall" "$w"; }
+[ -f "$HOME/.config/nvim/colors/aurora.lua" ] && say "Neovim theme written to ~/.config/nvim/colors/aurora.lua"
+
+say "open nvim once — lazy.nvim installs mini.base16, then restart nvim"
