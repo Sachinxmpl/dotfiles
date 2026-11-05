@@ -3,9 +3,11 @@ hyprland hypridle hyprlock hyprsunset hyprpolkitagent xdg-desktop-portal-hyprlan
 quickshell matugen awww
 kitty fish starship zoxide fzf eza bat fd ripgrep jq
 ttf-jetbrains-mono-nerd inter-font papirus-icon-theme adw-gtk-theme gnome-themes-extra
-pipewire wireplumber pipewire-pulse brightnessctl playerctl power-profiles-daemon
+pipewire pipewire-audio wireplumber pipewire-pulse libpulse brightnessctl playerctl power-profiles-daemon
 networkmanager bluez bluez-utils
-grim slurp wl-clipboard cliphist satty wf-recorder libnotify
+grim slurp wl-clipboard cliphist wtype satty wf-recorder libnotify
 nautilus gvfs gvfs-mtp ffmpegthumbnailer
+cava qt6-multimedia qt6-multimedia-ffmpeg
+neovim okular btop
 intel-media-driver libva-utils vulkan-intel nvidia-prime
 sddm yadm git

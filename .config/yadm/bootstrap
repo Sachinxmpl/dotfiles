@@ -22,8 +22,22 @@ gsettings set org.gnome.desktop.interface accent-color teal || true
 xdg-mime default org.gnome.Nautilus.desktop inode/directory || true
 [ "$(basename "$SHELL")" = fish ] || chsh -s /usr/bin/fish || true
 
+echo ":: services"
+sudo systemctl enable --now bluetooth || true      # bluetooth headphones / mice
+sudo systemctl enable --now NetworkManager || true
+
+echo ":: apps follow the wallpaper (GTK, btop, fish, VS Code if installed)"
+"$HOME/.local/bin/aurora-apps-setup" || true
+
 echo ":: wallpaper colours"
 wall=$(ls "$HOME"/wallpapers/* 2>/dev/null | head -1 || true)
 [ -n "$wall" ] && "$HOME/.local/bin/aurora-wall" "$wall" || true
 
+# Neovim theme + "open text files in nvim": only once LazyVim is in ~/.config/nvim
+if [ -d "$HOME/.config/nvim/lua/plugins" ] && [ -f "$HOME/.local/share/applications/nvim-kitty.desktop" ]; then
+    echo ":: neovim"
+    "$HOME/.local/bin/aurora-nvim-setup" || true
+fi
+
 echo ":: done — reboot and log in to Hyprland"
+echo "   not in the official repos (install with an AUR helper if you want them): envycontrol (GPU mode switch)"
